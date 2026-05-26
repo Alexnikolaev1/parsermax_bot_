@@ -22,6 +22,8 @@ export const KEY = {
   seen: (userId: string, urlHash: string) => `seen:${userId}:${urlHash}`,
   breaker: (source: string) => `breaker:${source}`,
   prefs: (userId: string) => `prefs:${userId}`,
+  pending: (userId: string) => `pending:${userId}`,
+  lastQuery: (userId: string) => `lastq:${userId}`,
 };
 
 /** TTL в секундах. */
@@ -31,4 +33,6 @@ export const TTL = {
   cache: 60 * 5,
   seen: 60 * 60 * 24,
   breaker: 60 * 10,
+  pending: 60 * 10,
+  lastQuery: 60 * 60 * 24,
 };

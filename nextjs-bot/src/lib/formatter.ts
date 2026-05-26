@@ -56,7 +56,6 @@ export function formatDigest(query: string, items: RawNews[], digest: AIDigest):
     lines.push("");
   });
 
-  lines.push("_🔄 Повторить: отправьте запрос текстом · `/subscribe` — мониторинг_");
   return lines.join("\n");
 }
 
@@ -98,16 +97,13 @@ export function formatSearchFallback(
 
 export function formatHelp(): string {
   return (
-    "📖 *Команды AI News Bot*\n\n" +
-    "• `/search <запрос>` — мгновенный AI-дайджест\n" +
-    "• _или просто напишите запрос_ без команды\n" +
-    "• `/subscribe <запрос>` — ежечасный мониторинг\n" +
-    "• `/unsubscribe <запрос>` — отписаться\n" +
-    "• `/list` — активные подписки\n" +
-    "• `/settings` — ваши настройки\n" +
-    "• `/settings hours 12` — глубина поиска (1–48 ч)\n" +
-    "• `/sources` — какие источники подключены\n" +
-    "• `/help` — эта справка"
+    "📖 *Справка AI News Bot*\n\n" +
+    "Управление — кнопками под сообщениями или командами:\n\n" +
+    "• *Поиск* — напишите тему или `/search <запрос>`\n" +
+    "• *Подписки* — почасовой мониторинг (`/subscribe`, `/list`)\n" +
+    "• *Настройки* — глубина 6/12/24 ч, статистика источников\n" +
+    "• `/menu` — главное меню\n" +
+    "• `/unsubscribe <тема>` — отписаться"
   );
 }
 

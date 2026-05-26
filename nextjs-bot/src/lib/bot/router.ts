@@ -13,9 +13,9 @@ const COMMAND_MAP: Record<string, Handler> = {
   list: (ctx) => commands.handleList(ctx),
   settings: (ctx, args) => commands.handleSettings(ctx, args),
   sources: commands.handleSources,
+  menu: commands.sendHome,
 };
 
-/** Минимальная длина свободного текстового запроса (без /). */
 const FREE_TEXT_MIN = 2;
 
 export async function dispatchMessage(ctx: BotContext): Promise<void> {
@@ -32,6 +32,8 @@ export async function dispatchMessage(ctx: BotContext): Promise<void> {
     }
     return commands.handleUnknown(ctx);
   }
+
+  if (await commands.handlePendingText(ctx)) return;
 
   if (text.length >= FREE_TEXT_MIN) {
     return commands.handleSearch(ctx, text);

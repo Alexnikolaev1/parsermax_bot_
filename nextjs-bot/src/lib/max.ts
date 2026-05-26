@@ -128,10 +128,16 @@ export async function sendLongMessage(opts: {
   chatId: string | number;
   text: string;
   maxChars: number;
+  /** Клавиатура только у последней части (после split). */
+  replyMarkup?: unknown;
 }): Promise<string[]> {
   const parts = splitMessage(opts.text, opts.maxChars);
-  for (const part of parts) {
-    await sendMessage({ chatId: opts.chatId, text: part });
+  for (let i = 0; i < parts.length; i++) {
+    await sendMessage({
+      chatId: opts.chatId,
+      text: parts[i],
+      replyMarkup: i === parts.length - 1 ? opts.replyMarkup : undefined,
+    });
   }
   return parts;
 }

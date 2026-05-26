@@ -2,6 +2,8 @@ import { hasLlm } from "../config";
 import { formatHelp } from "../formatter";
 import { sendMessage } from "../max";
 import { checkRateLimit } from "../rateLimit";
+import { saveLastQuery } from "../services/lastQuery";
+import { clearPending, getPending, setPending } from "../services/pending";
 import { runSearchPipeline } from "../services/searchPipeline";
 import {
   addSubscription,
@@ -12,47 +14,88 @@ import { getUserPrefs, setUserPrefs } from "../services/userPrefs";
 import { NEWS_SOURCES } from "../sources/registry";
 import type { Subscription } from "../types";
 import type { BotContext } from "./context";
+import {
+  cancelKeyboard,
+  helpKeyboard,
+  mainMenuKeyboard,
+  settingsKeyboard,
+  subscriptionsKeyboard,
+} from "./menu";
 
 async function ensureRateLimit(ctx: BotContext): Promise<boolean> {
   if (await checkRateLimit(ctx.userId)) return true;
   await sendMessage({
     chatId: ctx.chatId,
     text: "⏳ Слишком много запросов. Подождите минуту.",
+    replyMarkup: mainMenuKeyboard(),
   });
   return false;
 }
 
-export async function handleStart(ctx: BotContext): Promise<void> {
+export async function sendHome(ctx: BotContext): Promise<void> {
   await sendMessage({
     chatId: ctx.chatId,
     text:
-      "👋 Привет! Я *AI News Bot* для MAX.\n\n" +
-      "Обыскиваю Telegram, YouTube, Reddit, Hacker News, RSS 50+ СМИ и Google News — " +
-      "и выдаю AI-дайджест с кластеризацией сюжетов.\n\n" +
-      "Напишите запрос текстом или `/search <запрос>`.\n" +
-      "Справка: `/help`",
+      "👋 *AI News Bot*\n\n" +
+      "Собираю новости из Telegram, YouTube, Reddit, Hacker News, RSS и Google News — " +
+      "и свожу в AI-дайджест.\n\n" +
+      "Выберите действие кнопкой ниже или напишите запрос текстом.",
+    replyMarkup: mainMenuKeyboard(),
   });
 }
 
-export async function handleHelp(_ctx: BotContext): Promise<void> {
-  await sendMessage({ chatId: _ctx.chatId, text: formatHelp() });
+export async function sendSettings(ctx: BotContext, extra?: string): Promise<void> {
+  const p = await getUserPrefs(ctx.userId);
+  await sendMessage({
+    chatId: ctx.chatId,
+    text:
+      (extra ? `${extra}\n\n` : "") +
+      "⚙️ *Настройки*\n" +
+      `• Глубина поиска: *${p.hoursBack}* ч\n` +
+      `• Статистика источников: ${p.showSourceStats ? "вкл" : "выкл"}\n` +
+      `• LLM: ${hasLlm() ? "подключён" : "не настроен"}`,
+    replyMarkup: settingsKeyboard(p.hoursBack, p.showSourceStats),
+  });
+}
+
+export async function handleStart(ctx: BotContext): Promise<void> {
+  await clearPending(ctx.userId);
+  return sendHome(ctx);
+}
+
+export async function handleHelp(ctx: BotContext): Promise<void> {
+  await sendMessage({
+    chatId: ctx.chatId,
+    text: formatHelp(),
+    replyMarkup: helpKeyboard(),
+  });
 }
 
 export async function handleSearch(ctx: BotContext, query: string): Promise<void> {
   const q = query.trim();
   if (!q) {
-    await sendMessage({ chatId: ctx.chatId, text: "Использование: `/search <запрос>` или просто текст." });
+    await setPending(ctx.userId, "search");
+    await sendMessage({
+      chatId: ctx.chatId,
+      text: "🔍 Напишите, что искать — одним сообщением.",
+      replyMarkup: cancelKeyboard(),
+    });
     return;
   }
+
+  await clearPending(ctx.userId);
   if (!(await ensureRateLimit(ctx))) return;
 
+  await saveLastQuery(ctx.userId, q);
   const prefs = await getUserPrefs(ctx.userId);
   const status = await sendMessage({
     chatId: ctx.chatId,
     text: "🔄 Обыскиваю Telegram, YouTube, новости, Reddit и HN…",
+    replyMarkup: cancelKeyboard(),
   });
 
   await runSearchPipeline({
+    userId: ctx.userId,
     chatId: ctx.chatId,
     query: q,
     hoursBack: prefs.hoursBack,
@@ -64,9 +107,16 @@ export async function handleSearch(ctx: BotContext, query: string): Promise<void
 export async function handleSubscribe(ctx: BotContext, query: string): Promise<void> {
   const q = query.trim();
   if (!q) {
-    await sendMessage({ chatId: ctx.chatId, text: "Использование: `/subscribe <запрос>`" });
+    await setPending(ctx.userId, "subscribe");
+    await sendMessage({
+      chatId: ctx.chatId,
+      text: "➕ Напишите тему для подписки.",
+      replyMarkup: cancelKeyboard(),
+    });
     return;
   }
+
+  await clearPending(ctx.userId);
   const sub: Subscription = {
     userId: ctx.userId,
     chatId: ctx.chatId,
@@ -74,46 +124,56 @@ export async function handleSubscribe(ctx: BotContext, query: string): Promise<v
     createdAt: new Date().toISOString(),
   };
   await addSubscription(sub);
+  await saveLastQuery(ctx.userId, q);
   await sendMessage({
     chatId: ctx.chatId,
-    text: `✅ Подписка: *${q}*\nДайджест придёт при появлении новых материалов (cron каждый час).`,
+    text: `✅ Подписка: *${q}*\nБуду присылать дайджест при новых материалах (раз в час).`,
+    replyMarkup: mainMenuKeyboard(),
   });
 }
 
 export async function handleUnsubscribe(ctx: BotContext, query: string): Promise<void> {
   const q = query.trim();
   if (!q) {
-    await sendMessage({ chatId: ctx.chatId, text: "Использование: `/unsubscribe <запрос>`" });
+    await sendMessage({
+      chatId: ctx.chatId,
+      text: "Использование: `/unsubscribe <запрос>`",
+      replyMarkup: mainMenuKeyboard(),
+    });
     return;
   }
   await removeSubscription(ctx.userId, q);
-  await sendMessage({ chatId: ctx.chatId, text: `🗑 Подписка удалена: *${q}*` });
+  await sendMessage({
+    chatId: ctx.chatId,
+    text: `🗑 Подписка удалена: *${q}*`,
+    replyMarkup: mainMenuKeyboard(),
+  });
 }
 
 export async function handleList(ctx: BotContext): Promise<void> {
   const subs = await listUserSubscriptions(ctx.userId);
   if (!subs.length) {
-    await sendMessage({ chatId: ctx.chatId, text: "У вас нет подписок." });
+    await sendMessage({
+      chatId: ctx.chatId,
+      text: "📋 *Подписок пока нет.*\n\nНажмите «➕ Новая подписка» или `/subscribe <тема>`.",
+      replyMarkup: subscriptionsKeyboard([]),
+    });
     return;
   }
+
   const list = subs.map((s, i) => `${i + 1}. ${s.query}`).join("\n");
-  await sendMessage({ chatId: ctx.chatId, text: `*Ваши подписки:*\n${list}` });
+  await sendMessage({
+    chatId: ctx.chatId,
+    text: `📋 *Ваши подписки:*\n${list}\n\n_Нажмите тему для поиска · отписаться: /unsubscribe <тема>_`,
+    replyMarkup: subscriptionsKeyboard(subs.map((s) => s.query)),
+  });
 }
 
 export async function handleSettings(ctx: BotContext, args: string): Promise<void> {
   const parts = args.trim().split(/\s+/);
+
   if (!parts[0] || parts[0] === "show") {
-    const p = await getUserPrefs(ctx.userId);
-    await sendMessage({
-      chatId: ctx.chatId,
-      text:
-        `⚙️ *Настройки*\n` +
-        `• Глубина поиска: *${p.hoursBack}* ч\n` +
-        `• Статистика источников: ${p.showSourceStats ? "да" : "нет"}\n` +
-        `• LLM: ${hasLlm() ? "подключён" : "не настроен (сырой fallback)"}\n\n` +
-        `Изменить: \`/settings hours 12\``,
-    });
-    return;
+    return sendSettings(ctx);
   }
 
   if (parts[0] === "hours" && parts[1]) {
@@ -123,40 +183,55 @@ export async function handleSettings(ctx: BotContext, args: string): Promise<voi
       return;
     }
     await setUserPrefs(ctx.userId, { hoursBack: h });
-    await sendMessage({ chatId: ctx.chatId, text: `✅ Глубина поиска: *${h}* ч.` });
-    return;
+    return sendSettings(ctx, `✅ Глубина поиска: *${h}* ч.`);
   }
 
   if (parts[0] === "stats") {
     const on = parts[1] !== "off";
     await setUserPrefs(ctx.userId, { showSourceStats: on });
-    await sendMessage({
-      chatId: ctx.chatId,
-      text: `✅ Статистика источников: ${on ? "включена" : "выключена"}.`,
-    });
-    return;
+    return sendSettings(ctx, `✅ Статистика: ${on ? "вкл" : "выкл"}.`);
   }
 
+  const p = await getUserPrefs(ctx.userId);
   await sendMessage({
     chatId: ctx.chatId,
-    text: "Неизвестная настройка. Примеры:\n`/settings hours 12`\n`/settings stats off`",
+    text: "Используйте кнопки ниже или `/settings hours 12`.",
+    replyMarkup: settingsKeyboard(p.hoursBack, p.showSourceStats),
   });
 }
 
 export async function handleSources(ctx: BotContext): Promise<void> {
   const lines = NEWS_SOURCES.map((s) => {
     const ok = s.isAvailable();
-    return `${s.emoji} ${s.label} — ${ok ? "✅" : "⏸ (нет конфигурации)"}`;
+    return `${s.emoji} ${s.label} — ${ok ? "✅" : "⏸"}`;
   });
   await sendMessage({
     chatId: ctx.chatId,
-    text: `*Источники (${NEWS_SOURCES.length})*\n\n${lines.join("\n")}`,
+    text: `📡 *Источники (${NEWS_SOURCES.length})*\n\n${lines.join("\n")}`,
+    replyMarkup: mainMenuKeyboard(),
   });
 }
 
 export async function handleUnknown(ctx: BotContext): Promise<void> {
   await sendMessage({
     chatId: ctx.chatId,
-    text: "Неизвестная команда. `/help` — список команд.",
+    text: "Не понял команду. Выберите в меню или `/help`.",
+    replyMarkup: mainMenuKeyboard(),
   });
+}
+
+/** Текст при ожидании ввода после нажатия кнопки. */
+export async function handlePendingText(ctx: BotContext): Promise<boolean> {
+  const pending = await getPending(ctx.userId);
+  if (!pending) return false;
+
+  if (pending === "search") {
+    await handleSearch(ctx, ctx.text);
+    return true;
+  }
+  if (pending === "subscribe") {
+    await handleSubscribe(ctx, ctx.text);
+    return true;
+  }
+  return false;
 }

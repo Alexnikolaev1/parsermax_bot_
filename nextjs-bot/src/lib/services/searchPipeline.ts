@@ -1,11 +1,14 @@
 import { getConfig } from "../config";
 import { processWithAI } from "../aiProcessor";
 import { formatDigest, formatSourceStats, formatSearchFallback } from "../formatter";
+import { digestActionsKeyboard } from "../bot/menu";
+import { saveLastQuery } from "./lastQuery";
 import { editMessage, sendLongMessage } from "../max";
 import { searchAll, type SearchResult } from "../searchEngine";
 import type { AIDigest, RawNews } from "../types";
 
 export interface PipelineOptions {
+  userId: string;
   chatId: string;
   query: string;
   hoursBack: number;
@@ -21,8 +24,9 @@ export interface PipelineResult {
 }
 
 export async function runSearchPipeline(opts: PipelineOptions): Promise<PipelineResult> {
-  const { chatId, query, hoursBack, showSourceStats = true, statusMessageId } = opts;
+  const { userId, chatId, query, hoursBack, showSourceStats = true, statusMessageId } = opts;
 
+  await saveLastQuery(userId, query);
   const search = await searchAll(query, hoursBack);
 
   if (statusMessageId) {
@@ -51,7 +55,12 @@ export async function runSearchPipeline(opts: PipelineOptions): Promise<Pipeline
   }
 
   const maxChars = getConfig().MAX_MESSAGE_CHARS;
-  const texts = await sendLongMessage({ chatId, text: body, maxChars });
+  const texts = await sendLongMessage({
+    chatId,
+    text: body,
+    maxChars,
+    replyMarkup: digestActionsKeyboard(),
+  });
 
   return { search, digest, texts };
 }
