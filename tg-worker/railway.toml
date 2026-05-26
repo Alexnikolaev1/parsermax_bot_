@@ -1,0 +1,7 @@
+# Railway конфиг (опционально). Можно деплоить и без него.
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

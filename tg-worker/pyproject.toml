@@ -1,0 +1,18 @@
+[project]
+name = "tg-worker"
+version = "1.0.0"
+description = "Telethon-based Telegram public-channel search worker for MAX News Bot"
+requires-python = ">=3.11"
+dependencies = [
+    "telethon>=1.36",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.8",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
