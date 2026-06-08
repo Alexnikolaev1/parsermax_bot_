@@ -1,11 +1,20 @@
-/**
- * Типизированная конфигурация из process.env.
- * В serverless нет единой точки старта — читаем лениво при первом обращении.
- */
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-/** Vercel/пустой .env часто задаёт "" вместо отсутствия переменной — Zod .optional() это не пропускает. */
-const emptyToUndef = (v: unknown) =>
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+for (const f of [".env.local", ".env"]) {
+  const p = resolve(root, f);
+  if (!existsSync(p)) continue;
+  for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m && !process.env[m[1].trim()])
+      process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
+  }
+}
+
+const emptyToUndef = (v) =>
   v === "" || v === undefined || v === null ? undefined : v;
 
 const EnvSchema = z.object({
@@ -25,32 +34,18 @@ const EnvSchema = z.object({
   CRON_SECRET: z.preprocess(emptyToUndef, z.string().optional()),
   INSTANT_API_SECRET: z.preprocess(emptyToUndef, z.string().optional()),
   WARMUP_QUERIES: z.preprocess(emptyToUndef, z.string().optional()),
-  /** Макс. символов в одном сообщении Telegram (лимит API 4096). */
   TELEGRAM_MESSAGE_CHARS: z.coerce.number().int().min(500).max(4096).default(4000),
   DEFAULT_HOURS_BACK: z.coerce.number().int().min(1).max(48).default(6),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).max(60).default(10),
 });
 
-export type AppConfig = z.infer<typeof EnvSchema>;
-
-let cached: AppConfig | null = null;
-
-export function getConfig(): AppConfig {
-  if (!cached) cached = EnvSchema.parse(process.env);
-  return cached;
+const r = EnvSchema.safeParse(process.env);
+if (!r.success) {
+  console.log("CONFIG_FAIL");
+  for (const i of r.error.issues) console.log(`${i.path.join(".")}: ${i.message}`);
+  process.exit(1);
 }
-
-export function hasLlm(): boolean {
-  const c = getConfig();
-  return Boolean(c.LOVABLE_API_KEY || c.OPENAI_API_KEY);
-}
-
-export function hasRedis(): boolean {
-  const c = getConfig();
-  return Boolean(c.UPSTASH_REDIS_REST_URL && c.UPSTASH_REDIS_REST_TOKEN);
-}
-
-export function llmApiKey(): string {
-  const c = getConfig();
-  return c.LOVABLE_API_KEY || c.OPENAI_API_KEY || "";
-}
+console.log("CONFIG_OK");
+console.log("hasRedis:", !!(r.data.UPSTASH_REDIS_REST_URL && r.data.UPSTASH_REDIS_REST_TOKEN));
+console.log("hasLlm:", !!(r.data.LOVABLE_API_KEY || r.data.OPENAI_API_KEY));
+console.log("hasWebhookSecret:", !!r.data.TELEGRAM_WEBHOOK_SECRET);

@@ -1,15 +1,19 @@
+import { hasRedis } from "../config";
 import { redis, KEY } from "../db";
 import type { Subscription } from "../types";
 
 export async function addSubscription(sub: Subscription): Promise<void> {
+  if (!hasRedis()) return;
   await redis.set(KEY.sub(sub.userId, sub.query), sub);
 }
 
 export async function removeSubscription(userId: string, query: string): Promise<void> {
+  if (!hasRedis()) return;
   await redis.del(KEY.sub(userId, query));
 }
 
 export async function listUserSubscriptions(userId: string): Promise<Subscription[]> {
+  if (!hasRedis()) return [];
   const keys: string[] = [];
   let cursor: string | number = 0;
   do {
@@ -27,6 +31,7 @@ export async function listUserSubscriptions(userId: string): Promise<Subscriptio
 }
 
 export async function listAllSubscriptions(): Promise<Subscription[]> {
+  if (!hasRedis()) return [];
   const keys: string[] = [];
   let cursor: string | number = 0;
   do {

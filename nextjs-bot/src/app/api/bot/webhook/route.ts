@@ -39,28 +39,28 @@ function webhookAuthorized(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  if (!webhookAuthorized(req)) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-
-  let body: unknown;
   try {
-    body = await req.json();
-  } catch {
-    return new NextResponse("Bad JSON", { status: 400 });
-  }
+    if (!webhookAuthorized(req)) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
 
-  const parsed = TelegramUpdate.safeParse(body);
-  if (!parsed.success) {
-    console.error("Invalid Telegram update", parsed.error);
-    return NextResponse.json({ ok: true });
-  }
-  const upd = parsed.data;
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new NextResponse("Bad JSON", { status: 400 });
+    }
 
-  const fresh = await markUpdateOnce(upd.update_id);
-  if (!fresh) return NextResponse.json({ ok: true, dedup: true });
+    const parsed = TelegramUpdate.safeParse(body);
+    if (!parsed.success) {
+      console.error("Invalid Telegram update", parsed.error);
+      return NextResponse.json({ ok: true });
+    }
+    const upd = parsed.data;
 
-  try {
+    const fresh = await markUpdateOnce(upd.update_id);
+    if (!fresh) return NextResponse.json({ ok: true, dedup: true });
+
     if (upd.callback_query) {
       const cq = upd.callback_query;
       const chatId = String(cq.message?.chat.id ?? cq.from.id);
@@ -85,9 +85,10 @@ export async function POST(req: NextRequest) {
         text: msg.text!.trim(),
       });
     }
+
+    return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("webhook handler error:", e);
+    return NextResponse.json({ ok: true });
   }
-
-  return NextResponse.json({ ok: true });
 }
