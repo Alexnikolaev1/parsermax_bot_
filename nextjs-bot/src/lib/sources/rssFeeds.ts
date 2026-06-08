@@ -63,7 +63,7 @@ export const RSS_FEEDS: { url: string; source: string }[] = [
 
 const parser = new Parser({
   timeout: 3000,
-  headers: { "User-Agent": "MAXNewsBot/1.0 (+news monitor)" },
+  headers: { "User-Agent": "TelegramNewsBot/1.0 (+news monitor)" },
 });
 
 /** Параллельно качает все RSS, фильтрует по запросу, нормализует. */

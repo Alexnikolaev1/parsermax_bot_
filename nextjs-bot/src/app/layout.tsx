@@ -7,6 +7,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 export const metadata = {
-  title: "MAX News Bot",
-  description: "AI-powered news monitor for MAX messenger",
+  title: "Telegram AI News Bot",
+  description: "AI-powered news monitor for Telegram",
 };

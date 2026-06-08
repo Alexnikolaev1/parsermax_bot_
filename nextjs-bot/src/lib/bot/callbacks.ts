@@ -1,4 +1,4 @@
-import { answerCallback, sendMessage } from "../max";
+import { answerCallback, sendMessage } from "../telegram";
 import { getLastQuery, saveLastQuery } from "../services/lastQuery";
 import { clearPending, setPending } from "../services/pending";
 import { setUserPrefs } from "../services/userPrefs";
@@ -22,7 +22,7 @@ export async function dispatchCallback(ctx: CallbackContext): Promise<void> {
   try {
     await answerCallback(callbackId);
   } catch {
-    /* уведомление необязательно */
+    /* необязательно */
   }
 
   if (payload === CB.CANCEL) {
@@ -40,8 +40,8 @@ export async function dispatchCallback(ctx: CallbackContext): Promise<void> {
     await sendMessage({
       chatId: ctx.chatId,
       text:
-        "🔍 *Поиск*\n\nНапишите ключевые слова или фразу — например:\n" +
-        "_курс доллара_, _нейросети OpenAI_, _Спартак_",
+        "🔍 <b>Поиск</b>\n\nНапишите ключевые слова или фразу — например:\n" +
+        "<i>курс доллара</i>, <i>нейросети OpenAI</i>, <i>Спартак</i>",
       replyMarkup: cancelKeyboard(),
     });
     return;
@@ -51,7 +51,7 @@ export async function dispatchCallback(ctx: CallbackContext): Promise<void> {
     await setPending(ctx.userId, "subscribe");
     await sendMessage({
       chatId: ctx.chatId,
-      text: "➕ *Новая подписка*\n\nНапишите тему для почасового мониторинга.",
+      text: "➕ <b>Новая подписка</b>\n\nНапишите тему для почасового мониторинга.",
       replyMarkup: cancelKeyboard(),
     });
     return;
@@ -107,7 +107,7 @@ export async function dispatchCallback(ctx: CallbackContext): Promise<void> {
     const h = Number(payload.slice(4));
     if (h >= 1 && h <= 48) {
       await setUserPrefs(ctx.userId, { hoursBack: h });
-      return commands.sendSettings(ctx, `✅ Глубина поиска: *${h}* ч.`);
+      return commands.sendSettings(ctx, `✅ Глубина поиска: <b>${h}</b> ч.`);
     }
   }
 
@@ -125,10 +125,16 @@ export async function dispatchCallback(ctx: CallbackContext): Promise<void> {
     }
   }
 
+  if (payload.startsWith("u:q:")) {
+    const q = decodeQueryPayload(payload.slice(4));
+    if (q) {
+      return commands.handleUnsubscribe(ctx, q);
+    }
+  }
+
   await sendMessage({
     chatId: ctx.chatId,
     text: "Кнопка устарела. Откройте меню ниже.",
     replyMarkup: mainMenuKeyboard(),
   });
-  return;
 }

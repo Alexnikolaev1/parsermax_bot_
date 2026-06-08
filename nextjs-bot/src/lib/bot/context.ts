@@ -1,4 +1,4 @@
-/** Контекст одного входящего сообщения MAX. */
+/** Контекст одного входящего сообщения Telegram. */
 export interface BotContext {
   userId: string;
   chatId: string;

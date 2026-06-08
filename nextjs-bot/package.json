@@ -1,5 +1,5 @@
 {
-  "name": "max-news-bot",
+  "name": "telegram-news-bot",
   "version": "1.0.0",
   "private": true,
   "scripts": {

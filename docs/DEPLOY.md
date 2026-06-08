@@ -32,13 +32,12 @@ vercel
 vercel --prod
 ```
 
-В Vercel Project → Settings → Environment Variables пропишите всё из
-`.env.example`:
+В Vercel Project → Settings → Environment Variables:
 
 | Переменная | Значение |
 |---|---|
-| `MAX_BOT_TOKEN` | от @MasterBot |
-| `MAX_WEBHOOK_SECRET` | случайные 32+ символа |
+| `TELEGRAM_BOT_TOKEN` | от @BotFather |
+| `TELEGRAM_WEBHOOK_SECRET` | случайные 32+ символа |
 | `LOVABLE_API_KEY` | (или OPENAI_API_KEY) |
 | `LLM_BASE_URL` | `https://ai.gateway.lovable.dev/v1` |
 | `LLM_MODEL` | `google/gemini-3-flash-preview` |
@@ -50,26 +49,22 @@ vercel --prod
 
 После сохранения — Redeploy.
 
-## 3. Регистрация webhook в MAX
-
-Замените в команде ниже `<bot_token>`, `<your-app>` и `<webhook_secret>`:
+## 3. Регистрация webhook в Telegram
 
 ```bash
-curl -X POST "https://botapi.max.ru/subscriptions?access_token=<bot_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://<your-app>.vercel.app/api/bot/webhook",
-    "secret": "<webhook_secret>",
-    "headers": {"Authorization": "Bearer <webhook_secret>"},
-    "update_types": ["message_created", "bot_started", "message_callback"]
-  }'
+curl "https://<your-app>.vercel.app/api/bot/setup?url=https://<your-app>.vercel.app/api/bot/webhook" \
+  -H "Authorization: Bearer <CRON_SECRET>"
 ```
 
-Если форма payload в MAX отличается — поправьте `lib/max.ts`.
+Ответ: `{"ok":true,"webhookUrl":"...","commands":8,"info":{...}}`.
+
+Telegram будет слать обновления с заголовком
+`X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>`.
+
+Подробнее — [`TELEGRAM_BOT_SETUP.md`](./TELEGRAM_BOT_SETUP.md).
 
 ## 4. Smoke test
 
-1. `curl https://<your-app>.vercel.app/api/cron/health` → все `true`.
-2. `curl "https://<your-app>.vercel.app/api/search/instant?q=Путин&hours=6"` →
-   JSON с `digest.clusters` и `rendered`.
-3. В MAX напишите боту `/start`, затем `/search Путин`.
+1. `curl https://<your-app>.vercel.app/api/cron/health` → `redis`, `llm`, `tgWorker`.
+2. `curl -H "Authorization: Bearer <CRON_SECRET>" "https://<your-app>.vercel.app/api/search/instant?q=Путин&hours=6"` → JSON с `digest`.
+3. В Telegram напишите боту `/start`, затем «нейросети» или `/search Путин`.

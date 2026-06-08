@@ -16,7 +16,7 @@ export async function fetchTelegramViaWorker(query: string, hoursBack = 6): Prom
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        "User-Agent": "MAXNewsBot/1.0",
+        "User-Agent": "TelegramNewsBot/1.0",
       },
       body: JSON.stringify({ q: query, hours: hoursBack, limit: 30 }),
       signal: AbortSignal.timeout(7000),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processWithAI } from "@/lib/aiProcessor";
 import { redis, KEY, TTL } from "@/lib/db";
 import { formatDigest } from "@/lib/formatter";
-import { sendLongMessage } from "@/lib/max";
+import { sendLongMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config";
 import { searchAll } from "@/lib/searchEngine";
 import { listAllSubscriptions } from "@/lib/services/subscriptions";
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const subs = await listAllSubscriptions();
   let sent = 0;
-  const maxChars = getConfig().MAX_MESSAGE_CHARS;
+  const maxChars = getConfig().TELEGRAM_MESSAGE_CHARS;
 
   for (const sub of subs) {
     try {

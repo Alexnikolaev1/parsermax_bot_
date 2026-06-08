@@ -1,7 +1,7 @@
 [project]
 name = "tg-worker"
 version = "1.0.0"
-description = "Telethon-based Telegram public-channel search worker for MAX News Bot"
+description = "Telethon-based Telegram public-channel search worker for Telegram AI News Bot"
 requires-python = ">=3.11"
 dependencies = [
     "telethon>=1.36",

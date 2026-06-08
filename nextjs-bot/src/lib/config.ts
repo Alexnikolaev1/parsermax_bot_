@@ -5,8 +5,8 @@
 import { z } from "zod";
 
 const EnvSchema = z.object({
-  MAX_BOT_TOKEN: z.string().min(1).optional(),
-  MAX_WEBHOOK_SECRET: z.string().min(8).optional(),
+  TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(8).optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   LOVABLE_API_KEY: z.string().optional(),
@@ -18,8 +18,8 @@ const EnvSchema = z.object({
   CRON_SECRET: z.string().optional(),
   INSTANT_API_SECRET: z.string().optional(),
   WARMUP_QUERIES: z.string().optional(),
-  /** Макс. символов в одном сообщении MAX (запас под markdown). */
-  MAX_MESSAGE_CHARS: z.coerce.number().int().min(500).max(8000).default(3800),
+  /** Макс. символов в одном сообщении Telegram (лимит API 4096). */
+  TELEGRAM_MESSAGE_CHARS: z.coerce.number().int().min(500).max(4096).default(4000),
   DEFAULT_HOURS_BACK: z.coerce.number().int().min(1).max(48).default(6),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).max(60).default(10),
 });

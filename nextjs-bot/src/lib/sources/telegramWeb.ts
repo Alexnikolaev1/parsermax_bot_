@@ -21,7 +21,7 @@ export async function fetchTelegramWeb(query: string, hoursBack = 6): Promise<Ra
   const tasks = CHANNELS.map(async (channel) => {
     try {
       const res = await fetch(`https://t.me/s/${channel}`, {
-        headers: { "User-Agent": "MAXNewsBot/1.0" },
+        headers: { "User-Agent": "TelegramNewsBot/1.0" },
         signal: AbortSignal.timeout(3000),
       });
       if (!res.ok) return [] as RawNews[];

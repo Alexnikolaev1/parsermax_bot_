@@ -14,7 +14,7 @@ export async function fetchReddit(query: string, hoursBack = 6): Promise<RawNews
       `https://www.reddit.com/r/${sub}/search.json?` +
       `q=${encodeURIComponent(query)}&sort=new&restrict_sr=on&t=day&limit=15`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "MAXNewsBot/1.0" },
+      headers: { "User-Agent": "TelegramNewsBot/1.0" },
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return [] as RawNews[];

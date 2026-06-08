@@ -3,7 +3,7 @@ import { processWithAI } from "../aiProcessor";
 import { formatDigest, formatSourceStats, formatSearchFallback } from "../formatter";
 import { digestActionsKeyboard } from "../bot/menu";
 import { saveLastQuery } from "./lastQuery";
-import { editMessage, sendLongMessage } from "../max";
+import { editMessage, sendLongMessage } from "../telegram";
 import { searchAll, type SearchResult } from "../searchEngine";
 import type { AIDigest, RawNews } from "../types";
 
@@ -32,6 +32,7 @@ export async function runSearchPipeline(opts: PipelineOptions): Promise<Pipeline
   if (statusMessageId) {
     try {
       await editMessage(
+        chatId,
         statusMessageId,
         `🧠 AI анализирует ${search.items.length} материалов…`
       );
@@ -54,7 +55,7 @@ export async function runSearchPipeline(opts: PipelineOptions): Promise<Pipeline
     body = formatSearchFallback(query, search, (e as Error).message);
   }
 
-  const maxChars = getConfig().MAX_MESSAGE_CHARS;
+  const maxChars = getConfig().TELEGRAM_MESSAGE_CHARS;
   const texts = await sendLongMessage({
     chatId,
     text: body,
@@ -65,7 +66,7 @@ export async function runSearchPipeline(opts: PipelineOptions): Promise<Pipeline
   return { search, digest, texts };
 }
 
-/** Только поиск + AI без отправки в MAX (для API/cron). */
+/** Только поиск + AI без отправки в Telegram (для API/cron). */
 export async function buildDigestText(
   query: string,
   hoursBack: number,

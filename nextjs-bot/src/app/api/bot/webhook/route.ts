@@ -2,50 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dispatchCallback } from "@/lib/bot/callbacks";
 import { dispatchMessage } from "@/lib/bot/router";
-import * as commands from "@/lib/bot/commands";
+import { getConfig } from "@/lib/config";
 import { markUpdateOnce } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MaxUpdate = z.object({
-  update_type: z.string().optional(),
-  update_id: z.union([z.string(), z.number()]).optional(),
+const TelegramUpdate = z.object({
+  update_id: z.number(),
   message: z
     .object({
-      sender: z.object({ user_id: z.union([z.string(), z.number()]) }).optional(),
-      recipient: z.object({ chat_id: z.union([z.string(), z.number()]).optional() }).optional(),
-      body: z.object({ text: z.string().optional() }).optional(),
-      timestamp: z.number().optional(),
+      message_id: z.number(),
+      from: z.object({ id: z.number() }).optional(),
+      chat: z.object({ id: z.number() }),
+      text: z.string().optional(),
     })
     .optional(),
-  callback: z
+  callback_query: z
     .object({
-      callback_id: z.string(),
-      payload: z.string().optional(),
-      user: z.object({ user_id: z.union([z.string(), z.number()]) }).optional(),
+      id: z.string(),
+      from: z.object({ id: z.number() }),
+      data: z.string().optional(),
       message: z
         .object({
-          recipient: z.object({ chat_id: z.union([z.string(), z.number()]).optional() }).optional(),
+          chat: z.object({ id: z.number() }),
         })
         .optional(),
     })
     .optional(),
 });
 
-function chatIdFromMessage(
-  msg: NonNullable<z.infer<typeof MaxUpdate>["message"]>
-): { chatId: string; userId: string } | null {
-  const chatId = String(msg.recipient?.chat_id ?? msg.sender?.user_id ?? "");
-  const userId = String(msg.sender?.user_id ?? chatId);
-  if (!chatId) return null;
-  return { chatId, userId };
+function webhookAuthorized(req: NextRequest): boolean {
+  const expected = getConfig().TELEGRAM_WEBHOOK_SECRET;
+  if (!expected) return false;
+  return req.headers.get("x-telegram-bot-api-secret-token") === expected;
 }
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  const expected = process.env.MAX_WEBHOOK_SECRET;
-  if (!expected || auth !== `Bearer ${expected}`) {
+  if (!webhookAuthorized(req)) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -56,50 +50,40 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Bad JSON", { status: 400 });
   }
 
-  const parsed = MaxUpdate.safeParse(body);
+  const parsed = TelegramUpdate.safeParse(body);
   if (!parsed.success) {
-    console.error("Invalid MAX update", parsed.error);
+    console.error("Invalid Telegram update", parsed.error);
     return NextResponse.json({ ok: true });
   }
   const upd = parsed.data;
 
-  if (upd.update_id != null) {
-    const fresh = await markUpdateOnce(upd.update_id);
-    if (!fresh) return NextResponse.json({ ok: true, dedup: true });
-  }
+  const fresh = await markUpdateOnce(upd.update_id);
+  if (!fresh) return NextResponse.json({ ok: true, dedup: true });
 
   try {
-    if (upd.update_type === "bot_started") {
-      const uid = upd.message?.sender?.user_id;
-      const ids = upd.message ? chatIdFromMessage(upd.message) : null;
-      if (ids) await commands.handleStart({ ...ids, text: "" });
-      else if (uid)
-        await commands.handleStart({ userId: String(uid), chatId: String(uid), text: "" });
-      return NextResponse.json({ ok: true });
-    }
-
-    if (upd.callback?.callback_id) {
-      const cb = upd.callback;
-      const userId = String(cb.user?.user_id ?? "");
-      const chatId = String(
-        cb.message?.recipient?.chat_id ?? cb.user?.user_id ?? ""
-      );
-      const payload = cb.payload ?? "";
-      if (chatId && payload) {
+    if (upd.callback_query) {
+      const cq = upd.callback_query;
+      const chatId = String(cq.message?.chat.id ?? cq.from.id);
+      const userId = String(cq.from.id);
+      const payload = cq.data ?? "";
+      if (payload) {
         await dispatchCallback({
-          userId: userId || chatId,
+          userId,
           chatId,
           text: "",
-          callbackId: cb.callback_id,
+          callbackId: cq.id,
           payload,
         });
       }
-    } else if (upd.message) {
-      const ids = chatIdFromMessage(upd.message);
-      if (ids) {
-        const text = upd.message.body?.text?.trim() ?? "";
-        await dispatchMessage({ ...ids, text });
-      }
+    } else if (upd.message?.text) {
+      const msg = upd.message;
+      const chatId = String(msg.chat.id);
+      const userId = String(msg.from?.id ?? msg.chat.id);
+      await dispatchMessage({
+        userId,
+        chatId,
+        text: msg.text!.trim(),
+      });
     }
   } catch (e) {
     console.error("webhook handler error:", e);

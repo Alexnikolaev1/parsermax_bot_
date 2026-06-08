@@ -1,6 +1,6 @@
 import { hasLlm } from "../config";
 import { formatHelp } from "../formatter";
-import { sendMessage } from "../max";
+import { sendMessage } from "../telegram";
 import { checkRateLimit } from "../rateLimit";
 import { saveLastQuery } from "../services/lastQuery";
 import { clearPending, getPending, setPending } from "../services/pending";
@@ -36,8 +36,8 @@ export async function sendHome(ctx: BotContext): Promise<void> {
   await sendMessage({
     chatId: ctx.chatId,
     text:
-      "👋 *AI News Bot*\n\n" +
-      "Собираю новости из Telegram, YouTube, Reddit, Hacker News, RSS и Google News — " +
+      "👋 <b>AI News Bot</b>\n\n" +
+      "Собираю новости из Telegram-каналов, YouTube, Reddit, Hacker News, RSS и Google News — " +
       "и свожу в AI-дайджест.\n\n" +
       "Выберите действие кнопкой ниже или напишите запрос текстом.",
     replyMarkup: mainMenuKeyboard(),
@@ -50,8 +50,8 @@ export async function sendSettings(ctx: BotContext, extra?: string): Promise<voi
     chatId: ctx.chatId,
     text:
       (extra ? `${extra}\n\n` : "") +
-      "⚙️ *Настройки*\n" +
-      `• Глубина поиска: *${p.hoursBack}* ч\n` +
+      "⚙️ <b>Настройки</b>\n" +
+      `• Глубина поиска: <b>${p.hoursBack}</b> ч\n` +
       `• Статистика источников: ${p.showSourceStats ? "вкл" : "выкл"}\n` +
       `• LLM: ${hasLlm() ? "подключён" : "не настроен"}`,
     replyMarkup: settingsKeyboard(p.hoursBack, p.showSourceStats),
@@ -127,7 +127,7 @@ export async function handleSubscribe(ctx: BotContext, query: string): Promise<v
   await saveLastQuery(ctx.userId, q);
   await sendMessage({
     chatId: ctx.chatId,
-    text: `✅ Подписка: *${q}*\nБуду присылать дайджест при новых материалах (раз в час).`,
+    text: `✅ Подписка: <b>${esc(q)}</b>\nБуду присылать дайджест при новых материалах (раз в час).`,
     replyMarkup: mainMenuKeyboard(),
   });
 }
@@ -137,7 +137,7 @@ export async function handleUnsubscribe(ctx: BotContext, query: string): Promise
   if (!q) {
     await sendMessage({
       chatId: ctx.chatId,
-      text: "Использование: `/unsubscribe <запрос>`",
+      text: "Использование: /unsubscribe &lt;запрос&gt;",
       replyMarkup: mainMenuKeyboard(),
     });
     return;
@@ -145,9 +145,10 @@ export async function handleUnsubscribe(ctx: BotContext, query: string): Promise
   await removeSubscription(ctx.userId, q);
   await sendMessage({
     chatId: ctx.chatId,
-    text: `🗑 Подписка удалена: *${q}*`,
+    text: `🗑 Подписка удалена: <b>${esc(q)}</b>`,
     replyMarkup: mainMenuKeyboard(),
   });
+  return handleList(ctx);
 }
 
 export async function handleList(ctx: BotContext): Promise<void> {
@@ -155,7 +156,7 @@ export async function handleList(ctx: BotContext): Promise<void> {
   if (!subs.length) {
     await sendMessage({
       chatId: ctx.chatId,
-      text: "📋 *Подписок пока нет.*\n\nНажмите «➕ Новая подписка» или `/subscribe <тема>`.",
+      text: "📋 <b>Подписок пока нет.</b>\n\nНажмите «➕ Новая подписка» или /subscribe &lt;тема&gt;.",
       replyMarkup: subscriptionsKeyboard([]),
     });
     return;
@@ -164,7 +165,9 @@ export async function handleList(ctx: BotContext): Promise<void> {
   const list = subs.map((s, i) => `${i + 1}. ${s.query}`).join("\n");
   await sendMessage({
     chatId: ctx.chatId,
-    text: `📋 *Ваши подписки:*\n${list}\n\n_Нажмите тему для поиска · отписаться: /unsubscribe <тема>_`,
+    text:
+      `📋 <b>Ваши подписки:</b>\n${list}\n\n` +
+      "<i>🔍 — поиск · 🗑 — отписаться</i>",
     replyMarkup: subscriptionsKeyboard(subs.map((s) => s.query)),
   });
 }
@@ -183,7 +186,7 @@ export async function handleSettings(ctx: BotContext, args: string): Promise<voi
       return;
     }
     await setUserPrefs(ctx.userId, { hoursBack: h });
-    return sendSettings(ctx, `✅ Глубина поиска: *${h}* ч.`);
+    return sendSettings(ctx, `✅ Глубина поиска: <b>${h}</b> ч.`);
   }
 
   if (parts[0] === "stats") {
@@ -195,7 +198,7 @@ export async function handleSettings(ctx: BotContext, args: string): Promise<voi
   const p = await getUserPrefs(ctx.userId);
   await sendMessage({
     chatId: ctx.chatId,
-    text: "Используйте кнопки ниже или `/settings hours 12`.",
+    text: "Используйте кнопки ниже или /settings hours 12.",
     replyMarkup: settingsKeyboard(p.hoursBack, p.showSourceStats),
   });
 }
@@ -207,7 +210,7 @@ export async function handleSources(ctx: BotContext): Promise<void> {
   });
   await sendMessage({
     chatId: ctx.chatId,
-    text: `📡 *Источники (${NEWS_SOURCES.length})*\n\n${lines.join("\n")}`,
+    text: `📡 <b>Источники (${NEWS_SOURCES.length})</b>\n\n${lines.join("\n")}`,
     replyMarkup: mainMenuKeyboard(),
   });
 }
@@ -215,12 +218,11 @@ export async function handleSources(ctx: BotContext): Promise<void> {
 export async function handleUnknown(ctx: BotContext): Promise<void> {
   await sendMessage({
     chatId: ctx.chatId,
-    text: "Не понял команду. Выберите в меню или `/help`.",
+    text: "Не понял команду. Выберите в меню или /help.",
     replyMarkup: mainMenuKeyboard(),
   });
 }
 
-/** Текст при ожидании ввода после нажатия кнопки. */
 export async function handlePendingText(ctx: BotContext): Promise<boolean> {
   const pending = await getPending(ctx.userId);
   if (!pending) return false;
@@ -234,4 +236,8 @@ export async function handlePendingText(ctx: BotContext): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

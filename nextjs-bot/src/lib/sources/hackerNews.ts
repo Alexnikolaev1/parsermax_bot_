@@ -26,7 +26,7 @@ export async function fetchHackerNews(query: string, hoursBack = 6): Promise<Raw
     });
 
   const res = await fetchWithTimeout(url, {
-    headers: { "User-Agent": "MAXNewsBot/1.0" },
+    headers: { "User-Agent": "TelegramNewsBot/1.0" },
     timeoutMs: 4000,
   });
   if (!res.ok) return [];

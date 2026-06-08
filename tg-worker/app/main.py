@@ -59,7 +59,7 @@ async def lifespan(_: FastAPI):
         await searcher.stop()
 
 
-app = FastAPI(title="MAX News tg-worker", lifespan=lifespan)
+app = FastAPI(title="Telegram News tg-worker", lifespan=lifespan)
 app.add_middleware(RequestLogMiddleware)
 
 
