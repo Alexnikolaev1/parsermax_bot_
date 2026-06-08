@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverComponentsExternalPackages: ["cheerio"],
+    serverComponentsExternalPackages: ["cheerio", "rss-parser"],
   },
 };
 export default nextConfig;

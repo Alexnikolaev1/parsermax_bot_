@@ -18,14 +18,30 @@
 
 ## Webhook
 
-После деплоя на Vercel:
+### Способ A — скрипт (рекомендуется)
+
+Создайте `nextjs-bot/.env.local` с `TELEGRAM_BOT_TOKEN` и `TELEGRAM_WEBHOOK_SECRET`
+(те же значения, что в Vercel).
+
+```bash
+cd nextjs-bot
+npm run setup:webhook -- --url https://<ваш-публичный-домен>/api/bot/webhook
+```
+
+Скрипт вызывает Telegram API напрямую — деплой для *регистрации* webhook не нужен,
+но по этому URL бот должен быть доступен из интернета.
+
+### Способ B — через API после деплоя
 
 ```bash
 curl "https://<your-app>.vercel.app/api/bot/setup?url=https://<your-app>.vercel.app/api/bot/webhook" \
   -H "Authorization: Bearer <CRON_SECRET>"
 ```
 
-Это установит webhook, `secret_token` и меню команд.
+### Важно для Vercel
+
+Отключите **Deployment Protection** для Production (Settings → Deployment Protection),
+иначе Telegram не сможет слать обновления на webhook (получите «Authentication Required»).
 
 Проверка вручную:
 

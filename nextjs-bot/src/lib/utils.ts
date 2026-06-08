@@ -38,6 +38,25 @@ export function matchesQuery(text: string, query: string): boolean {
   return tokens.every((t) => hay.includes(t));
 }
 
+/** Ограничение параллелизма без p-limit (несовместим с webpack в Next 14). */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit & { timeoutMs?: number } = {}

@@ -1,7 +1,6 @@
 import Parser from "rss-parser";
-import pLimit from "p-limit";
 import type { RawNews } from "../types";
-import { matchesQuery, normalizeUrl } from "../utils";
+import { mapWithConcurrency, matchesQuery, normalizeUrl } from "../utils";
 
 /** ~50 русскоязычных и мировых СМИ. Дополняйте по вкусу. */
 export const RSS_FEEDS: { url: string; source: string }[] = [
@@ -68,34 +67,30 @@ const parser = new Parser({
 
 /** Параллельно качает все RSS, фильтрует по запросу, нормализует. */
 export async function fetchRssFeeds(query: string, hoursBack = 6): Promise<RawNews[]> {
-  const limit = pLimit(8); // не больше 8 параллельных HTTP
   const cutoff = Date.now() - hoursBack * 60 * 60 * 1000;
-  const tasks = RSS_FEEDS.map((feed) =>
-    limit(async () => {
-      try {
-        const f = await parser.parseURL(feed.url);
-        return f.items
-          .filter((it) => {
-            const text = `${it.title ?? ""} ${it.contentSnippet ?? ""}`;
-            if (!matchesQuery(text, query)) return false;
-            const t = new Date(it.isoDate ?? it.pubDate ?? 0).getTime();
-            return t >= cutoff;
-          })
-          .map((it): RawNews => ({
-            id: normalizeUrl(it.link ?? ""),
-            title: (it.title ?? "").trim(),
-            snippet: (it.contentSnippet ?? "").trim().slice(0, 300),
-            url: it.link ?? "",
-            source: feed.source,
-            kind: "rss",
-            publishedAt: new Date(it.isoDate ?? it.pubDate ?? Date.now()).toISOString(),
-          }));
-      } catch {
-        return [];
-      }
-    })
-  );
+  const batches = await mapWithConcurrency(RSS_FEEDS, 8, async (feed) => {
+    try {
+      const f = await parser.parseURL(feed.url);
+      return f.items
+        .filter((it) => {
+          const text = `${it.title ?? ""} ${it.contentSnippet ?? ""}`;
+          if (!matchesQuery(text, query)) return false;
+          const t = new Date(it.isoDate ?? it.pubDate ?? 0).getTime();
+          return t >= cutoff;
+        })
+        .map((it): RawNews => ({
+          id: normalizeUrl(it.link ?? ""),
+          title: (it.title ?? "").trim(),
+          snippet: (it.contentSnippet ?? "").trim().slice(0, 300),
+          url: it.link ?? "",
+          source: feed.source,
+          kind: "rss",
+          publishedAt: new Date(it.isoDate ?? it.pubDate ?? Date.now()).toISOString(),
+        }));
+    } catch {
+      return [];
+    }
+  });
 
-  const results = await Promise.allSettled(tasks);
-  return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  return batches.flat();
 }
